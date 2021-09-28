@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands, tasks
-import AkariDB as adb
 import asyncio
 import os
 import time
@@ -16,14 +15,26 @@ DIR = os.path.dirname(__file__)
 db = sqlite3.connect(os.path.join(DIR, "Tess.db"))
 SQL = db.cursor()
 
+tessguildid = 884945081138823198
+
 logchannel = None
 hwchannel = None
 hwchannelid = 884945553480359969
+botcage = 823312775468023858
+
 admins = [891966113473249282, 262288342035595268] # бот, Дима
 dima = None
 dimaid = 262288342035595268
-tessguildid = 884945081138823198
 
+# colors
+raincolors = [0xff0000, 0x8b0000, 0xcd5c5c, 0xff1493,
+              0xff4500, 0xffa000, 0xffd700, 0xffff00,
+              0xee82ee, 0x9400d3, 0x8b008b, 0x4b0082,
+              0xccff00, 0x00ff00, 0x00ff7f, 0x006400,
+              0x08e8de, 0x00bfff, 0x2c75ff, 0x00008b,
+              0xb8860b, 0xd2691e, 0x8b4513, 0x808000, 0xf0e68c, 0xffd1b8]
+
+# experience
 congrats = 0
 e_savetime = 120
 e_onlinetime = 5
@@ -61,6 +72,29 @@ def tesort(l):
     return a
 
 
+def levelmode(x, mode=0):
+    if mode == 0:
+        return 2700 * x ** 1.552700
+    elif mode == 1:
+        return 15 * x ** 2.5
+    elif mode == 2:
+        return 6005 * x ** 1.4
+
+
+def levelget(exp, mode=0, all=None):
+    x = 1
+    lvlexp = levelmode(1, mode)
+    while True:
+        if exp > lvlexp:
+            exp -= lvlexp
+            x += 1
+            lvlexp = levelmode(x, mode) - levelmode(x - 1, mode)
+        elif all:
+            return [x, int(exp), int(lvlexp)]
+        else:
+            return x
+
+
 class TessMem:
     def __init__(self, data):
         self.id, self.server, self.nick, self.name, self.exp, self.allmessages, self.messages, self.symbols, self.pictures, self.online = data
@@ -76,14 +110,14 @@ class TessMem:
         except:
             pass
 
-        lvl = adb.levelget(self.exp)
+        lvl = levelget(self.exp)
         self.exp += eadd
         if reason:
             if reason != 'online':
                 print(f'{self.nick} получил {eadd} exp ({reason})')
         else:
             print(f'{self.nick} получил {eadd} exp')
-        lvl_new = adb.levelget(self.exp)
+        lvl_new = levelget(self.exp)
         # if lvl_new > lvl:
             # await channel.send(f'Повышение! у {rolemention(self)} **{lvl_new}** уровень!')
 
@@ -169,7 +203,7 @@ async def on_ready():
     global dima
     TELoad()
     gr = 'Кубоид интегрировался в трёхмерное пространство'
-    logchannel = bot.get_channel(adb.botcage)
+    logchannel = bot.get_channel(botcage)
     hwchannel = bot.get_channel(hwchannelid)
     dima = bot.get_user(dimaid)
     bot.loop.create_task(TESavetask())
@@ -239,7 +273,7 @@ async def TessExp(mes):
 @bot.command()
 async def exp(ctx):
     newvehicles = tesort([expd[ctx.guild.id][e] for e in expd[ctx.guild.id]])
-    embed = discord.Embed(title=f'Опыт {ctx.guild.name}', colour=random.choice(adb.raincolors))
+    embed = discord.Embed(title=f'Опыт {ctx.guild.name}', colour=random.choice(raincolors))
     memids = [x.id for x in ctx.guild.members]
     memids.pop(memids.index(admins[0]))
     all_list = [0, 0, 0, 0, 0, 0]
@@ -260,7 +294,7 @@ async def exp(ctx):
     embed.add_field(name=f'Опыт: {all.exp}', value=text, inline=False)
     for i in newvehicles:
         if i.id in memids:
-            lvl = adb.levelget(i.exp, all=True)
+            lvl = levelget(i.exp, all=True)
             mem = ctx.guild.get_member(i.id)
             text = f'{mem.display_name} **{lvl[0]}** уровня'
             if i.allmessages:
