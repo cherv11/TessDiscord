@@ -146,9 +146,8 @@ def TESavedef():
             SQL.execute(f'SELECT * FROM exp WHERE id = {m} AND server = {g}')
             u = SQL.fetchall()
             if not u:
-                mem = bot.get_guild(g).get_member(m)
                 sql_insert = 'INSERT INTO exp(id, server, nick, exp, allmessages, messages, symbols, pictures, online) VALUES (?,?,?,?,?,?,?,?,?)'
-                SQL.execute(sql_insert, (m, g, mem.name, i.exp, i.allmessages, i.messages, i.symbols, i.pictures, i.online))
+                SQL.execute(sql_insert, (m, g, i.nick, i.exp, i.allmessages, i.messages, i.symbols, i.pictures, i.online))
                 db.commit()
             else:
                 SQL.execute(f"UPDATE exp SET exp = {i.exp}, allmessages = {i.allmessages}, messages = {i.messages}, symbols = {i.symbols}, pictures = {i.pictures}, online = {i.online} WHERE id = {m} AND server = {g}")
