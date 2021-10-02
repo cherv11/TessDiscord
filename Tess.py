@@ -51,6 +51,9 @@ t = (2021, 10, 6, 18, 55, 00, 3, 0, 0)
 lessons = [10**10]+[time.mktime(t)+i*604800 for i in range(27)]
 expd = defaultdict(dict)
 
+if not os.path.exists('HWs'):
+    os.mkdir('HWs')
+
 
 def postfix(v, ps, rv=True):
     if v % 10 in [0, 5, 6, 7, 8, 9] or v % 100 in [11, 12, 13, 14]:
@@ -220,22 +223,26 @@ async def on_message(message):
             return
         tt = time.time()
         lsn = 0
-        for i,l in enumerate(lessons):
+        for i, l in enumerate(lessons):
             if tt > l:
                 lsn = i
         add_name = f' (**{message.author.name}**)' if message.author.name != message.author.display_name else ''
         async for i in dima.history():
             await i.delete()
         await dima.send(f'Домашка от пользователя {message.author.display_name}{add_name} за **{lsn}** занятие\nОтветить: {prefix}d {message.author.id} {lsn} <балл> <комментарий>')
-        await dima.send(message.content)
+        if message.content:
+            await dima.send(message.content)
         for a in message.attachments:
-            await dima.send(attachment=a)
+            fn = f'{lsn}-{str(message.author.id)[-5:]}-{random.randint(100, 999)}-{a.filename}'
+            await a.save(f'HWs\\{fn}')
+            await dima.send(file=discord.File(fp=f'HWs\\{fn}'))
+            os.remove(f'HWs\\{fn}')
         await message.delete()
 
 
 @bot.event
-async def on_message_edit(message):
-    await bot.process_commands(message)
+async def on_message_edit(_, after):
+    await bot.process_commands(after)
 
 
 @bot.event
