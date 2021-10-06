@@ -227,8 +227,6 @@ async def on_message(message):
             if tt > l:
                 lsn = i
         add_name = f' (**{message.author.name}**)' if message.author.name != message.author.display_name else ''
-        async for i in dima.history():
-            await i.delete()
         await dima.send(f'Домашка от пользователя {message.author.display_name}{add_name} за **{lsn}** занятие\nОтветить: {prefix}d {message.author.id} {lsn} <балл> <комментарий>')
         if message.content:
             await dima.send(message.content)
