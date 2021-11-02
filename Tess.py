@@ -50,6 +50,7 @@ bot.remove_command("help")
 t = (2021, 10, 6, 18, 55, 00, 3, 0, 0)
 lessons = [10**10]+[time.mktime(t)+i*604800 for i in range(27)]
 expd = defaultdict(dict)
+quis = {}
 
 if not os.path.exists('HWs'):
     os.mkdir('HWs')
@@ -227,15 +228,35 @@ async def on_message(message):
             if tt > l:
                 lsn = i
         add_name = f' (**{message.author.name}**)' if message.author.name != message.author.display_name else ''
-        await dima.send(f'Домашка от пользователя {message.author.display_name}{add_name} за **{lsn}** занятие\nОтветить: {prefix}d {message.author.id} {lsn} <балл> <комментарий>')
+        await dima.send(f'Домашка от пользователя {message.author.display_name}{add_name} за **{lsn}** занятие\nОтветить: {prefix}d {message.author.id} {lsn} <балл> <макс.балл> <комментарий>')
         if message.content:
             await dima.send(message.content)
+            if len(message.content) > 1800:
+                await message.author.send('Вы отправили:')
+                await message.author.send(message.content)
+            else:
+                await message.author.send('Вы отправили:\n'+message.content)
+        else:
+            await message.author.send('Вы отправили:')
         for a in message.attachments:
             fn = f'{lsn}-{str(message.author.id)[-5:]}-{random.randint(100, 999)}-{a.filename}'
             await a.save(f'HWs\\{fn}')
             await dima.send(file=discord.File(fp=f'HWs\\{fn}'))
+            await message.author.send(file=discord.File(fp=f'HWs\\{fn}'))
             os.remove(f'HWs\\{fn}')
         await message.delete()
+    if type(message.channel) == discord.DMChannel:
+        if message.author.id in admins:
+            return
+        add_name = f' (**{message.author.name}**)' if message.author.name != message.author.display_name else ''
+        await dima.send(f'Сообщение от пользователя {message.author.display_name}{add_name}\nОтветить: {prefix}p {message.author.id} <сообщение>')
+        if message.content:
+            await dima.send(message.content)
+        for a in message.attachments:
+            fn = f'{str(message.author.id)[-5:]}-{random.randint(100, 999)}-{a.filename}'
+            await a.save(f'HWs\\{fn}')
+            await dima.send(file=discord.File(fp=f'HWs\\{fn}'))
+            os.remove(f'HWs\\{fn}')
 
 
 @bot.event
@@ -251,6 +272,40 @@ async def on_member_join(m):
             print(g.id, m.id)
     except:
         expd[g.id][m.id] = TessMem([g.id, m.id, m.name, '', 0, 0, 0, 0, 0, 0])
+
+
+@bot.event
+async def on_raw_reaction_add(payload):
+    if payload.message_id in quis and payload.user_id != bot.user.id:
+        mes = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
+        qdict = quis[payload.message_id]
+        emb = discord.Embed(title='Опрос', description=qdict['desc'])
+        for i in qdict['ans']:
+            if not i['emo'] == str(payload.emoji):
+                try:
+                    await mes.remove_reaction(i['emo'], payload.member)
+                except:
+                    pass
+        mes = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
+        all = 0
+        for ii,i in enumerate(qdict['ans']):
+            for r in mes.reactions:
+                if str(r.emoji) == i['emo']:
+                    qdict['ans'][ii]['count'] = r.count - 1
+                    all += r.count - 1
+        for i in qdict['ans']:
+            if all == 0:
+                prog = '░' * 20
+                perc = f'0.00%'
+                add = ''
+            else:
+                prog = int(round((i['count'] / all) * 20))
+                prog = f"{'▓' * prog}{'░' * (20 - prog)}"
+                perc = f"{round((i['count'] / all) * 100, 2)}%"
+                add = f"({i['count']})" if i['count'] > 0 else ''
+            emb.add_field(name=i['name'] + ' ' + add, value=f"{i['emo']} {prog} {perc}", inline=False)
+            emb.set_footer(icon_url=qdict['author'].avatar_url, text=f"©{qdict['author'].display_name}")
+        await mes.edit(embed=emb)
 
 
 async def TessExp(mes):
@@ -306,7 +361,7 @@ async def exp(ctx):
             if i.messages:
                 text += f', текстовых: {i.messages}'
             if i.symbols:
-                text += f', картиночек: {i.symbols}'
+                text += f', символов: {i.symbols}'
             if i.pictures:
                 text += f', картиночек: {i.pictures}'
             if i.online:
@@ -320,13 +375,76 @@ async def exp(ctx):
 
 
 @bot.command()
-async def d(ctx, id, lesson, grade, *comm):
-    comm = ''.join(comm)
+async def d(ctx, id, lesson, grade, maxgrade, *comm):
+    comm = ctx.message.content.split(' ', maxsplit=5)[-1]
+    # comm = ' '.join(comm)
     mem = bot.get_user(int(id))
-    text = f'Домашка к занятию **{lesson}** проверена! У вас **{grade}** {postfix(int(grade), ["балл", "балла", "баллов"], False)}.'
+    text = f'Домашка к занятию **{lesson}** проверена! У вас **{grade}/{maxgrade}** {postfix(int(grade), ["балл", "балла", "баллов"], False)}.'
     if comm:
         text += f' Комментарий:\n{comm}'
     await mem.send(text)
+    await ctx.send(f'Отправлено {mem.display_name}')
+
+
+@bot.command()
+async def p(ctx, id, *comm):
+    # comm = ' '.join(comm)
+    comm = ctx.message.content.split(' ', maxsplit=2)[-1]
+    mem = bot.get_user(int(id))
+    if comm:
+        await mem.send(comm)
+    for a in ctx.message.attachments:
+        fn = f'{str(ctx.message.author.id)[-5:]}-{random.randint(100, 999)}-{a.filename}'
+        await a.save(f'HWs\\{fn}')
+        await mem.send(file=discord.File(fp=f'HWs\\{fn}'))
+        os.remove(f'HWs\\{fn}')
+    await ctx.send(f'Отправлено {mem.display_name}')
+
+
+@bot.command()
+async def t(ctx, id, *comm):
+    # comm = ' '.join(comm)
+    comm = ctx.message.content.split(' ', maxsplit=2)[-1]
+    mem = ctx.author
+    if comm:
+        await mem.send(comm)
+    for a in ctx.message.attachments:
+        fn = f'{str(ctx.message.author.id)[-5:]}-{random.randint(100, 999)}-{a.filename}'
+        await a.save(f'HWs\\{fn}')
+        await mem.send(file=discord.File(fp=f'HWs\\{fn}'))
+        os.remove(f'HWs\\{fn}')
+
+
+@bot.command()
+async def online(ctx, lsn: int):
+    SQL.execute(f'SELECT nick FROM exp WHERE id IN (SELECT user FROM les_online WHERE les = {lsn})')
+    mems = SQL.fetchall()
+    await ctx.send(f'Онлайн на {lsn} паре:\n'+'\n'.join([i[0] for i in mems]))
+
+
+@bot.command()
+async def qui(ctx, *args):
+    try:
+        args = ' '.join(args).split('|')
+        desc = args[0]
+        emb = discord.Embed(title='Опрос', description=desc)
+        qdict = {'desc': desc, 'author': ctx.author, 'ans': []}
+        n = 0
+        for i in args[1:]:
+            n += 1
+            ans, emo = i.split('<', maxsplit=1)
+            emo = '<' + emo.split('>')[0] + '>'
+            prog = '░' * 20
+            perc = f'0.00%'
+            emb.add_field(name=f'{n}. {ans}', value=f'{emo} {prog} {perc}', inline=False)
+            emb.set_footer(icon_url=ctx.author.avatar_url, text=f'©{ctx.author.display_name}')
+            qdict['ans'].append({'name': f'{n}. {ans}', 'emo': emo, 'count': 0})
+        mes = await ctx.send(embed=emb)
+        for i in qdict['ans']:
+            await mes.add_reaction(i['emo'])
+        quis[mes.id] = qdict
+    except Exception as e:
+        print(e)
 
 
 token = open('tess_token.txt').readlines()[0]
